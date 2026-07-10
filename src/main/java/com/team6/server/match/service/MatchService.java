@@ -33,8 +33,14 @@ public class MatchService {
                 .map(RingResponse.ActiveEventDto::from)
                 .collect(Collectors.toList());
 
-        // 대결 가능한 본인 기억 요약 리스트
-        List<RingResponse.AvailableEpisodeDto> availableEpisodes = new ArrayList<>();
+        // 대결 가능한 본인 에피소드 요약 리스트
+        List<RingResponse.AvailableEpisodeDto> availableEpisodes = episodeRepository.findAllByMemberIdAndStatus(memberId, "AVAILABLE").stream()
+                .map(episode -> new RingResponse.AvailableEpisodeDto(
+                        episode.getId(),
+                        episode.getTitle(),
+                        episode.getEpisodeDate() != null ? episode.getEpisodeDate().toString() : "" // 💡 LocalDateTime을 String으로 변환하여 DTO 스펙 일치
+                ))
+                .collect(Collectors.toList());
 
         // 현재 진행 중인 대결 조회
         RingResponse.ActiveMatchDto activeMatch = null;
@@ -50,30 +56,42 @@ public class MatchService {
     /* 대결 시작 로직 */
     @Transactional
     public Long startMatch(Long memberId, MatchRequestDto request) {
-        // 비관적 락 획득
+        // 1. 요청한 두 ID가 같은 경우 검증
+        if (request.getEpisodeAId().equals(request.getEpisodeBId())) {
+            throw new IllegalArgumentException("동일한 에피소드는 대결할 수 없습니다.");
+        }
+
+        // 비관적 락 획득하며 조회
         List<Episode> episodes = episodeRepository.findAllByIdWithPessimisticLock(
                 List.of(request.getEpisodeAId(), request.getEpisodeBId()));
 
-        Episode e1 = episodes.get(0);
-        Episode e2 = episodes.get(1);
-
-        // 예외 검증
-        if (e1.getMemberId().equals(e2.getMemberId())) {
-            throw new IllegalArgumentException("본인의 에피소드 간 대결은 불가능합니다.");
+        if (episodes.size() < 2) {
+            throw new IllegalArgumentException("요청하신 에피소드 데이터를 찾을 수 없습니다.");
         }
+
+        // ID 순서 보장하며 데이터 매핑
+        Episode e1 = episodes.stream()
+                .filter(e -> e.getId().equals(request.getEpisodeAId()))
+                .findFirst().orElseThrow();
+        Episode e2 = episodes.stream()
+                .filter(e -> e.getId().equals(request.getEpisodeBId()))
+                .findFirst().orElseThrow();
+
+        // 예외 검증: 두 에피소드 모두 로그인한 회원의 소유여야 함
+        if (!e1.getMemberId().equals(memberId) || !e2.getMemberId().equals(memberId)) {
+            throw new IllegalArgumentException("본인의 에피소드만 대결을 진행할 수 있습니다.");
+        }
+
+        // 대결 가능한 상태(AVAILABLE)인지 검증
         if (!"AVAILABLE".equals(e1.getStatus()) || !"AVAILABLE".equals(e2.getStatus())) {
             throw new IllegalStateException("대결 가능한 상태가 아닙니다.");
         }
-
-        // 상태 변경 및 매칭 생성
-        e1.updateStatus("MATCHING");
-        e2.updateStatus("MATCHING");
 
         Match match = Match.builder()
                 .memberId(memberId)
                 .episodeAId(e1.getId())
                 .episodeBId(e2.getId())
-                .status("PROGRESS")
+                .status("IN_PROGRESS")
                 .startedAt(LocalDateTime.now())
                 .build();
 
@@ -92,15 +110,12 @@ public class MatchService {
             throw new IllegalStateException("본인의 대결만 취소할 수 있습니다.");
         }
 
-        // 참여한 두 에피소드 조회 및 상태 복구
-        List<Episode> episodes = episodeRepository.findAllByIdWithPessimisticLock(
-                List.of(match.getEpisodeAId(), match.getEpisodeBId()));
-
-        for (Episode episode : episodes) {
-            episode.updateStatus("AVAILABLE");
+        // 이미 완료된 대결은 취소 불가 검증
+        if (!"IN_PROGRESS".equals(match.getStatus())) {
+            throw new IllegalStateException("진행 중인 대결만 취소할 수 있습니다.");
         }
 
-        // 대결 데이터 삭제
+        // 대결 데이터 삭제 (에피소드 상태는 변경하지 않았으므로 복구 로직 불필요)
         matchRepository.delete(match);
     }
 }

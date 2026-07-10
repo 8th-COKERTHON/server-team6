@@ -15,4 +15,6 @@ public interface EpisodeRepository extends JpaRepository<Episode, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select e from Episode e where e.id in :episodeIds order by e.id asc")
     List<Episode> findAllByIdWithPessimisticLock(@Param("episodeIds") List<Long> episodeIds);
+
+    List<Episode> findAllByMemberIdAndStatus(Long memberId, String status);
 }
