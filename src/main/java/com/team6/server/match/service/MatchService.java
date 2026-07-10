@@ -26,14 +26,14 @@ public class MatchService {
                 .collect(Collectors.toList());
 
         // 대결 가능한 본인 기억 요약 리스트
-        List<RingResponse.AvailableMemoryDto> availableMemories = new ArrayList<>();
+        List<RingResponse.AvailableEpisodeDto> availableEpisodes = new ArrayList<>();
 
         // 현재 진행 중인 대결 조회
         RingResponse.ActiveMatchDto activeMatch = null;
 
         return new RingResponse(
                 null,
-                availableMemories,
+                availableEpisodes,
                 activeMatch,
                 activeEvents
         );
