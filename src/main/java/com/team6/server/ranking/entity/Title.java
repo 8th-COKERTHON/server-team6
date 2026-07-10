@@ -27,7 +27,7 @@ public class Title {
     @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(length = 505)
+    @Column(length = 500)
     private String description;
 
     @Column(name = "min_score", nullable = false)

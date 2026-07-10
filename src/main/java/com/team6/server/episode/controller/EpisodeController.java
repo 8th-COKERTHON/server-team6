@@ -77,4 +77,14 @@ public class EpisodeController {
             Authentication authentication) {
         return ApiResponse.success(service.getAll(status, size, cursor, authentication));
     }
+
+    @GetMapping("/search")
+    @Operation(summary = "내 에피소드 검색", description = "현재 회원이 등록한 전체 에피소드를 제목에서 먼저 검색하고, 제목 결과가 없으면 내용에서 검색합니다.")
+    public ApiResponse<EpisodeSearchResponse> search(
+            @RequestParam String query,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size,
+            Authentication authentication) {
+        return ApiResponse.success(service.search(query, page, size, authentication));
+    }
 }

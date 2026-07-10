@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Page;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -104,6 +105,24 @@ public class EpisodeService {
         return new EpisodeListResponse(items, nextCursor, hasNext);
     }
 
+    @Transactional(readOnly = true)
+    public EpisodeSearchResponse search(String queryValue, int page, int size, Authentication authentication) {
+        var member = currentMember.require(authentication);
+        String query = normalizeSearchQuery(queryValue);
+        boolean titleMatch = episodes.existsByMemberIdAndTitleContainingIgnoreCase(member.getId(), query);
+        Page<Episode> result = titleMatch
+                ? episodes.findByMemberIdAndTitleContainingIgnoreCaseOrderByCreatedAtDescIdDesc(
+                        member.getId(), query, PageRequest.of(page, size))
+                : episodes.findByMemberIdAndContentContainingIgnoreCaseOrderByCreatedAtDescIdDesc(
+                        member.getId(), query, PageRequest.of(page, size));
+        var items = result.getContent().stream().map(episode -> new EpisodeSearchItemResponse(
+                episode.getId(), episode.getTitle(), preview(episode.getContent()), episode.getEpisodeDate(),
+                episode.getStatus().name())).toList();
+        String matchedBy = result.getTotalElements() == 0 ? "NONE" : titleMatch ? "TITLE" : "CONTENT";
+        return new EpisodeSearchResponse(query, matchedBy, items, page, size, result.getTotalElements(),
+                result.getTotalPages(), result.hasNext());
+    }
+
     private Episode.Status parseStatus(String value) {
         if (value == null || value.isBlank()) return null;
         try {
@@ -116,5 +135,16 @@ public class EpisodeService {
     private String preview(String content) {
         String normalized = content.replaceAll("\\s+", " ").strip();
         return normalized.length() <= 120 ? normalized : normalized.substring(0, 120) + "…";
+    }
+
+    private String normalizeSearchQuery(String value) {
+        if (value == null || value.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "검색어를 입력해야 합니다.");
+        }
+        String query = value.strip();
+        if (query.length() < 2 || query.length() > 50) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "검색어는 2자 이상 50자 이하여야 합니다.");
+        }
+        return query;
     }
 }

@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -43,4 +44,12 @@ public interface EpisodeRepository extends JpaRepository<Episode, Long> {
     List<Episode> findAllByIdWithPessimisticLock(@Param("episodeIds") List<Long> episodeIds);
 
     List<Episode> findAllByMemberIdAndStatusOrderByCreatedAtDescIdDesc(Long memberId, Episode.Status status);
+
+    boolean existsByMemberIdAndTitleContainingIgnoreCase(Long memberId, String query);
+
+    Page<Episode> findByMemberIdAndTitleContainingIgnoreCaseOrderByCreatedAtDescIdDesc(
+            Long memberId, String query, Pageable pageable);
+
+    Page<Episode> findByMemberIdAndContentContainingIgnoreCaseOrderByCreatedAtDescIdDesc(
+            Long memberId, String query, Pageable pageable);
 }
