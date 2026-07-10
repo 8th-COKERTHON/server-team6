@@ -25,14 +25,14 @@ public class Match {
     @Column(name = "member_id", nullable = false)
     private Long memberId;
 
-    @Column(name = "memory_a_id", nullable = false)
-    private Long memoryAId;
+    @Column(name = "episode_a_id", nullable = false)
+    private Long episodeAId;
 
-    @Column(name = "memory_b_id", nullable = false)
-    private Long memoryBId;
+    @Column(name = "episode_b_id", nullable = false)
+    private Long episodeBId;
 
-    @Column(name = "winner_memory_id")
-    private Long winnerMemoryId;
+    @Column(name = "winner_episode_id")
+    private Long winnerEpisodeId;
 
     @Column(nullable = false, length = 20)
     private String status;
