@@ -9,8 +9,6 @@ import com.team6.server.episode.EpisodeRanking;
 import com.team6.server.episode.dto.*;
 import com.team6.server.episode.repository.EpisodeRankingRepository;
 import com.team6.server.episode.repository.EpisodeRepository;
-import com.team6.server.matching.EpisodeMatch;
-import com.team6.server.matching.repository.EpisodeMatchRepository;
 import com.team6.server.member.Member;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -30,18 +28,16 @@ public class EpisodeService {
     private final CurrentMemberProvider currentMember;
     private final TitleSuggestionProvider titleSuggestions;
     private final Clock clock;
-    private final EpisodeMatchRepository matches;
     private final EpisodeCursorCodec cursors;
 
     public EpisodeService(EpisodeRepository episodes, EpisodeRankingRepository rankings,
                          CurrentMemberProvider currentMember, TitleSuggestionProvider titleSuggestions, Clock clock,
-                         EpisodeMatchRepository matches, EpisodeCursorCodec cursors) {
+                         EpisodeCursorCodec cursors) {
         this.episodes = episodes;
         this.rankings = rankings;
         this.currentMember = currentMember;
         this.titleSuggestions = titleSuggestions;
         this.clock = clock;
-        this.matches = matches;
         this.cursors = cursors;
     }
 
@@ -54,9 +50,8 @@ public class EpisodeService {
         rankings.save(new EpisodeRanking(episode));
         episodes.flush();
         long availableCount = episodes.countByMemberIdAndStatus(member.getId(), Episode.Status.AVAILABLE);
-        boolean hasActiveMatch = matches.existsByMemberIdAndStatus(member.getId(), EpisodeMatch.Status.IN_PROGRESS);
         return new CreateEpisodeResponse(episode.getId(), episode.getStatus().name(), 0, null,
-                availableCount, availableCount >= 2 && !hasActiveMatch, episode.getCreatedAt());
+                availableCount, false, episode.getCreatedAt());
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)

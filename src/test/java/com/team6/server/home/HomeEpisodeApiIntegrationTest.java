@@ -8,14 +8,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team6.server.auth.repository.MemberRepository;
 import com.team6.server.global.security.JwtProvider;
-import com.team6.server.matching.repository.MatchingEventRepository;
-import com.team6.server.matching.MatchingEvent;
-import com.team6.server.matching.repository.EpisodeMatchRepository;
 import com.team6.server.member.Member;
 import com.team6.server.episode.repository.EpisodeRankingRepository;
 import com.team6.server.episode.repository.EpisodeRepository;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,8 +30,6 @@ class HomeEpisodeApiIntegrationTest {
     @Autowired MemberRepository members;
     @Autowired EpisodeRepository episodes;
     @Autowired EpisodeRankingRepository rankings;
-    @Autowired EpisodeMatchRepository matches;
-    @Autowired MatchingEventRepository events;
     @Autowired PasswordEncoder passwordEncoder;
     @Autowired JwtProvider jwtProvider;
 
@@ -43,10 +37,8 @@ class HomeEpisodeApiIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        matches.deleteAll();
         rankings.deleteAll();
         episodes.deleteAll();
-        events.deleteAll();
         members.deleteAll();
         Member member = members.save(new Member("home@example.com", passwordEncoder.encode("password123!"), "홈 사용자"));
         accessToken = jwtProvider.createAccessToken(member.getId(), member.getRole().name());
@@ -65,7 +57,7 @@ class HomeEpisodeApiIntegrationTest {
     }
 
     @Test
-    void multipleEpisodesCanBeRegisteredInOneDayAndEnableMatch() throws Exception {
+    void multipleEpisodesCanBeRegisteredInOneDayWithoutEnablingRolledBackMatch() throws Exception {
         createEpisode("첫 번째 제목", LocalDate.now());
 
         mockMvc.perform(post("/api/v1/episodes")
@@ -74,7 +66,7 @@ class HomeEpisodeApiIntegrationTest {
                         .content(episodeBody("수정 가능한 두 번째 제목", LocalDate.now())))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.availableEpisodeCount").value(2))
-                .andExpect(jsonPath("$.data.canStartMatch").value(true));
+                .andExpect(jsonPath("$.data.canStartMatch").value(false));
 
         mockMvc.perform(get("/api/v1/home").header("Authorization", bearer()))
                 .andExpect(status().isOk())
@@ -104,21 +96,6 @@ class HomeEpisodeApiIntegrationTest {
                         .content(objectMapper.writeValueAsString(Map.of("content", "면접에서 아쉽게 탈락했다."))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.title").value("면접에서 아쉽게 탈락했다"));
-    }
-
-    @Test
-    void homeReturnsOnlyScheduledFutureEvents() throws Exception {
-        LocalDateTime tomorrow = LocalDateTime.now().plusDays(1);
-        events.save(new MatchingEvent(MatchingEvent.Type.WEEKLY, "예정 회차", tomorrow,
-                tomorrow.plusDays(1), MatchingEvent.Status.SCHEDULED, 10));
-        events.save(new MatchingEvent(MatchingEvent.Type.MONTHLY, "초안 회차", tomorrow.plusHours(1),
-                tomorrow.plusDays(2), MatchingEvent.Status.DRAFT, 20));
-
-        mockMvc.perform(get("/api/v1/home").header("Authorization", bearer()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.upcomingEvents.length()").value(1))
-                .andExpect(jsonPath("$.data.upcomingEvents[0].title").value("예정 회차"))
-                .andExpect(jsonPath("$.data.upcomingEvents[0].daysRemaining").value(1));
     }
 
     @Test
