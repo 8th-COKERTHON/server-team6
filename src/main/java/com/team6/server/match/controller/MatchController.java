@@ -44,4 +44,20 @@ public class MatchController {
         matchService.cancelMatch(authentication, matchId);
         return ApiResponse.noDataSuccess();
     }
+
+    /* 대결 결과 확정 API */
+    @Operation(
+            summary = "기억 대결 결과 확정",
+            description = "두 에피소드 중 더 안 좋은 기억 하나를 선택하여 점수를 정산하고 대결을 종료합니다."
+    )
+    @PostMapping("/matches/{matchId}/result")
+    public com.team6.server.global.response.ApiResponse<com.team6.server.match.dto.MatchResultResponseDto> completeMatch(
+            @PathVariable Long matchId,
+            @RequestBody com.team6.server.match.dto.MatchResultRequestDto request,
+            Authentication authentication) {
+
+        return com.team6.server.global.response.ApiResponse.success(
+                matchService.completeMatch(authentication, matchId, request)
+        );
+    }
 }

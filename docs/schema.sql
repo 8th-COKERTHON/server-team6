@@ -153,7 +153,7 @@ CREATE TABLE titles (
 
 CREATE TABLE episode_rankings (
     episode_id BIGINT NOT NULL,
-    title_score BIGINT NOT NULL DEFAULT 0,
+    title_score BIGINT NOT NULL DEFAULT 1000,
     current_title_id BIGINT NULL,
     version BIGINT NOT NULL DEFAULT 0,
     created_at DATETIME(6) NOT NULL,
@@ -161,7 +161,7 @@ CREATE TABLE episode_rankings (
     PRIMARY KEY (episode_id),
     CONSTRAINT fk_episode_rankings_episode FOREIGN KEY (episode_id) REFERENCES episodes (id),
     CONSTRAINT fk_episode_rankings_title FOREIGN KEY (current_title_id) REFERENCES titles (id),
-    CONSTRAINT ck_episode_rankings_title_score CHECK (title_score >= 0),
+    CONSTRAINT ck_episode_rankings_title_score CHECK (title_score >= 100),
     INDEX idx_episode_rankings_title (title_score DESC, episode_id ASC)
 );
 

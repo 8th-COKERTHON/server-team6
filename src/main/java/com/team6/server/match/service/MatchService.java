@@ -6,16 +6,23 @@ import com.team6.server.global.exception.BusinessException;
 import com.team6.server.global.exception.ErrorCode;
 import com.team6.server.global.security.CurrentMemberProvider;
 import com.team6.server.match.dto.MatchRequestDto;
+import com.team6.server.match.dto.MatchResultResponseDto;
 import com.team6.server.match.dto.RingResponseDto;
 import com.team6.server.match.entity.Match;
 import com.team6.server.match.repository.MatchRepository;
 import com.team6.server.match.repository.MatchingEventRepository;
 import java.time.LocalDateTime;
 import java.util.List;
+
+import com.team6.server.ranking.entity.RankingEpisodeScore;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.team6.server.ranking.repository.RankingEpisodeScoreRepository;
+import com.team6.server.ranking.repository.RankingScoreEventRepository;
+import com.team6.server.ranking.repository.TitleRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +32,10 @@ public class MatchService {
     private final EpisodeRepository episodeRepository;
     private final MatchRepository matchRepository;
     private final CurrentMemberProvider currentMember;
+
+    private final RankingEpisodeScoreRepository episodeRankingRepository;
+    private final RankingScoreEventRepository rankingScoreEventRepository;
+    private final TitleRepository titleRepository;
 
     @Transactional(readOnly = true)
     public RingResponseDto getRingScreen(Authentication authentication) {
@@ -105,5 +116,137 @@ public class MatchService {
     private Episode find(List<Episode> episodes, Long id) {
         return episodes.stream().filter(episode -> episode.getId().equals(id)).findFirst()
                 .orElseThrow(() -> new BusinessException(ErrorCode.EPISODE_NOT_FOUND));
+    }
+
+    /* 대결 결과 확정 로직 */
+    @Transactional
+    public MatchResultResponseDto completeMatch(
+            Authentication authentication,
+            Long matchId,
+            com.team6.server.match.dto.MatchResultRequestDto request
+    ) {
+        Long memberId = currentMember.require(authentication).getId();
+        Long winnerId = request.getWinnerEpisodeId();
+        if (winnerId == null) {
+            throw new BusinessException(ErrorCode.INVALID_MATCH_RESULT);
+        }
+
+        // 대결 검증
+        Match match = matchRepository.findByIdWithPessimisticLock(matchId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MATCH_NOT_FOUND));
+
+        if (!"IN_PROGRESS".equals(match.getStatus())) {
+            throw new BusinessException(ErrorCode.MATCH_ALREADY_COMPLETED);
+        }
+
+        // 소유권 검증
+        if (!match.getMemberId().equals(memberId)) {
+            throw new BusinessException(ErrorCode.MATCH_NOT_FOUND);
+        }
+
+        // 승자 검증
+        if (!winnerId.equals(match.getEpisodeAId()) && !winnerId.equals(match.getEpisodeBId())) {
+            throw new BusinessException(ErrorCode.INVALID_MATCH_RESULT);
+        }
+
+        // 점수 원장 기록 - 중복 지급 방지용 멱등 키 적용
+        String winnerEventKey = "MATCH_" + matchId + "_WINNER";
+        String loserEventKey = "MATCH_" + matchId + "_LOSER";
+        if (rankingScoreEventRepository.existsByEventKey(winnerEventKey)
+                || rankingScoreEventRepository.existsByEventKey(loserEventKey)) {
+            throw new BusinessException(ErrorCode.MATCH_ALREADY_COMPLETED);
+        }
+
+        Long loserId = winnerId.equals(match.getEpisodeAId()) ? match.getEpisodeBId() : match.getEpisodeAId();
+        RankingEpisodeScore winnerRanking = findOrCreateRanking(winnerId);
+        RankingEpisodeScore loserRanking = findOrCreateRanking(loserId);
+        ScoreDelta scoreDelta = calculateScoreDelta(winnerRanking.getTitleScore(), loserRanking.getTitleScore());
+
+        winnerRanking.applyDelta(scoreDelta.winnerDelta());
+        loserRanking.applyDelta(scoreDelta.loserDelta());
+
+        updateTitle(winnerRanking);
+        updateTitle(loserRanking);
+        episodeRankingRepository.save(winnerRanking);
+        episodeRankingRepository.save(loserRanking);
+
+        com.team6.server.ranking.entity.RankingScoreEvent winnerScoreEvent = com.team6.server.ranking.entity.RankingScoreEvent.builder()
+                .eventKey(winnerEventKey)
+                .episodeId(winnerId)
+                .scoreType("TITLE")
+                .delta(scoreDelta.winnerDelta())
+                .sourceType("MATCH_COMPLETED")
+                .sourceId(matchId)
+                .occurredAt(LocalDateTime.now())
+                .build();
+        rankingScoreEventRepository.save(winnerScoreEvent);
+
+        com.team6.server.ranking.entity.RankingScoreEvent loserScoreEvent = com.team6.server.ranking.entity.RankingScoreEvent.builder()
+                .eventKey(loserEventKey)
+                .episodeId(loserId)
+                .scoreType("TITLE")
+                .delta(scoreDelta.loserDelta())
+                .sourceType("MATCH_COMPLETED")
+                .sourceId(matchId)
+                .occurredAt(LocalDateTime.now())
+                .build();
+        rankingScoreEventRepository.save(loserScoreEvent);
+
+        match.complete(winnerId);
+        restoreMatchedEpisodes(match);
+
+        return com.team6.server.match.dto.MatchResultResponseDto.builder()
+                .matchId(match.getId())
+                .status(match.getStatus())
+                .winnerEpisodeId(winnerId)
+                .winnerEpisodeScoreAwarded(scoreDelta.winnerDelta())
+                .winnerEpisodeTitleScore(winnerRanking.getTitleScore())
+                .winnerEpisodeTitle(winnerRanking.getCurrentTitle() != null ? winnerRanking.getCurrentTitle().getName() : null)
+                .completedAt(match.getCompletedAt())
+                .build();
+    }
+
+    private RankingEpisodeScore findOrCreateRanking(Long episodeId) {
+        return episodeRankingRepository.findById(episodeId)
+                .orElseGet(() -> RankingEpisodeScore.initial(episodeId));
+    }
+
+    private void updateTitle(RankingEpisodeScore ranking) {
+        List<com.team6.server.ranking.entity.Title> titles = titleRepository.findAllByOrderByMinScoreAsc();
+        com.team6.server.ranking.entity.Title matchedTitle = null;
+        for (com.team6.server.ranking.entity.Title title : titles) {
+            if (ranking.getTitleScore() >= title.getMinScore()) {
+                matchedTitle = title;
+            }
+        }
+        ranking.updateTitle(matchedTitle);
+    }
+
+    private void restoreMatchedEpisodes(Match match) {
+        List<Episode> episodes = episodeRepository.findAllByIdWithPessimisticLock(
+                List.of(match.getEpisodeAId(), match.getEpisodeBId()));
+        if (episodes.size() != 2) {
+            throw new BusinessException(ErrorCode.EPISODE_NOT_FOUND);
+        }
+        episodes.forEach(Episode::restoreAvailable);
+    }
+
+    private ScoreDelta calculateScoreDelta(long winnerScore, long loserScore) {
+        long diff = Math.abs(winnerScore - loserScore);
+        if (diff <= 100) {
+            return new ScoreDelta(50L, -50L);
+        }
+
+        boolean winnerWasStronger = winnerScore > loserScore;
+        if (diff <= 250) {
+            return winnerWasStronger ? new ScoreDelta(30L, -80L) : new ScoreDelta(80L, -30L);
+        }
+        if (diff <= 500) {
+            return winnerWasStronger ? new ScoreDelta(20L, -120L) : new ScoreDelta(120L, -20L);
+        }
+        return winnerWasStronger ? new ScoreDelta(10L, -150L) : new ScoreDelta(150L, -10L);
+    }
+
+    private record ScoreDelta(long winnerDelta, long loserDelta) {
     }
 }

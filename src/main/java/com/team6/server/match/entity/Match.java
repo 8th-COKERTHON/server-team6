@@ -50,4 +50,10 @@ public class Match {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    public void complete(Long winnerEpisodeId) {
+        this.status = "COMPLETED";
+        this.winnerEpisodeId = winnerEpisodeId;
+        this.completedAt = LocalDateTime.now();
+    }
 }
