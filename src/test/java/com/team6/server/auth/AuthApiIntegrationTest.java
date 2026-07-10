@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.team6.server.member.MemberRepository;
+import com.team6.server.auth.repository.MemberRepository;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,6 +71,11 @@ class AuthApiIntegrationTest {
 
         JsonNode tokens = login("user@example.com", "password123!");
         String accessToken = tokens.path("data").path("accessToken").asText();
+
+        org.assertj.core.api.Assertions.assertThat(tokens.path("data").path("name").asText())
+                .isEqualTo("테스트 사용자");
+        org.assertj.core.api.Assertions.assertThat(tokens.path("data").path("email").asText())
+                .isEqualTo("user@example.com");
 
         mockMvc.perform(get("/api/v1/sample/me")
                         .header("Authorization", "Bearer " + accessToken))
