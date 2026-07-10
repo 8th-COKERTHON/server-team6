@@ -19,7 +19,7 @@ public class MatchingEvent {
     private Long id;
 
     @Column(name = "event_type", nullable = false, length = 20)
-    private String eventType;
+    private String eventType; // 'WEEKLY', 'MONTHLY', 'SPECIAL'
 
     @Column(nullable = false, length = 100)
     private String title;
@@ -27,19 +27,17 @@ public class MatchingEvent {
     @Column(length = 1000)
     private String description;
 
-    @Column(name = "application_opens_at")
-    private LocalDateTime applicationOpensAt;
-
-    @Column(name = "application_closes_at")
-    private LocalDateTime applicationClosesAt;
-
-    @Column(name = "starts_at")
+    @Column(name = "starts_at", nullable = false)
     private LocalDateTime startsAt;
 
-    private Integer capacity;
+    @Column(name = "ends_at", nullable = false)
+    private LocalDateTime endsAt;
 
     @Column(nullable = false, length = 20)
-    private String status;
+    private String status; // 'DRAFT', 'OPEN', 'CLOSED', 'CANCELLED'
+
+    @Column(name = "score_reward", nullable = false)
+    private Long scoreReward; // DEFAULT 0
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
