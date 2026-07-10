@@ -79,4 +79,28 @@ public class MatchService {
 
         return matchRepository.save(match).getId();
     }
+
+    /* 대결 취소 로직 */
+    @Transactional
+    public void cancelMatch(Long memberId, Long matchId) {
+        // 대결 엔티티 조회
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 대결을 찾을 수 없습니다."));
+
+        // 본인의 대결인지 확인
+        if (!match.getMemberId().equals(memberId)) {
+            throw new IllegalStateException("본인의 대결만 취소할 수 있습니다.");
+        }
+
+        // 참여한 두 에피소드 조회 및 상태 복구
+        List<Episode> episodes = episodeRepository.findAllByIdWithPessimisticLock(
+                List.of(match.getEpisodeAId(), match.getEpisodeBId()));
+
+        for (Episode episode : episodes) {
+            episode.updateStatus("AVAILABLE");
+        }
+
+        // 대결 데이터 삭제
+        matchRepository.delete(match);
+    }
 }

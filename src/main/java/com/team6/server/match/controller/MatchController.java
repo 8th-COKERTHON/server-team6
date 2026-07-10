@@ -40,4 +40,15 @@ public class MatchController {
         Long mockMemberId = 1L;
         return ApiResponse.success(matchService.startMatch(mockMemberId, request));
     }
+
+    /* 대결 취소 API */
+    @Operation(summary = "대결 취소",
+            description = "진행 중인 대결을 취소하고 에피소드 상태를 복구합니다."
+    )
+    @DeleteMapping("/matches/{matchId}")
+    public ApiResponse<Void> cancelMatch(@PathVariable Long matchId) {
+        Long mockMemberId = 1L;
+        matchService.cancelMatch(mockMemberId, matchId);
+        return ApiResponse.success(null);
+    }
 }
