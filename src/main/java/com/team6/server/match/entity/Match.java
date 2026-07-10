@@ -19,10 +19,9 @@ public class Match {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "event_id", nullable = true) // Nullable 허용 반영
+    @JoinColumn(name = "event_id", nullable = true)
     private MatchingEvent matchingEvent;
 
-    // 테이블 무결성 규칙상 회원 테이블 및 메모리 소유권과 엄격하게 묶여있으므로 Long ID로 안전하게 들고 감
     @Column(name = "member_id", nullable = false)
     private Long memberId;
 
@@ -36,7 +35,7 @@ public class Match {
     private Long winnerMemoryId;
 
     @Column(nullable = false, length = 20)
-    private String status; // 'IN_PROGRESS', 'COMPLETED', 'CANCELLED' (기본값 'IN_PROGRESS')
+    private String status;
 
     @Column(name = "started_at", nullable = false)
     private LocalDateTime startedAt;

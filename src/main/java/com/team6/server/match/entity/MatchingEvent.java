@@ -7,7 +7,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "matching_events")
+@Table(name = "matching_events") // 테이블명 싱크 맞추기
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
@@ -37,7 +37,7 @@ public class MatchingEvent {
     private String status; // 'DRAFT', 'OPEN', 'CLOSED', 'CANCELLED'
 
     @Column(name = "score_reward", nullable = false)
-    private Long scoreReward; // DEFAULT 0
+    private Long scoreReward; // 기본값 0
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
