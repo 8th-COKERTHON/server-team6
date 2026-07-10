@@ -43,7 +43,26 @@ class AuthApiIntegrationTest {
     void protectedApiRejectsUnauthenticatedUser() throws Exception {
         mockMvc.perform(get("/api/v1/sample/me"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+                .andExpect(jsonPath("$.code").value("AUTH_401_4"));
+    }
+
+    @Test
+    void protectedApiRejectsInvalidTokenWithStablePublicCode() throws Exception {
+        mockMvc.perform(get("/api/v1/sample/me")
+                        .header("Authorization", "Bearer invalid-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("AUTH_401_1"));
+    }
+
+    @Test
+    void invalidSignUpRequestUsesValidationErrorCode() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signUpBody("not-an-email", "short", "")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("GLOBAL_400_2"));
     }
 
     @Test
@@ -57,6 +76,7 @@ class AuthApiIntegrationTest {
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
                 .andExpect(jsonPath("$.data.memberId", not(blankOrNullString())));
     }
 
@@ -82,7 +102,7 @@ class AuthApiIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(signUpBody("duplicate@example.com", "password123!", "다른 사용자")))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("EMAIL_DUPLICATED"));
+                .andExpect(jsonPath("$.code").value("MEMBER_409_1"));
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -90,7 +110,7 @@ class AuthApiIntegrationTest {
                                 "email", "duplicate@example.com",
                                 "password", "wrong-password"))))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+                .andExpect(jsonPath("$.code").value("AUTH_401_5"));
     }
 
     private void signUp(String email, String password, String name) throws Exception {
