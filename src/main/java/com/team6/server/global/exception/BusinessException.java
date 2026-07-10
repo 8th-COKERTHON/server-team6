@@ -13,7 +13,7 @@ public class BusinessException extends RuntimeException {
         this.errorCode = e;
     }
 
-    // 🔥 완성: 상황에 맞는 구체적인 커스텀 메시지가 필요할 때 사용
+    // 상황에 맞는 구체적인 커스텀 메시지가 필요할 때 사용
     public BusinessException(ErrorCode e, String customMessage) {
         super(customMessage);
         this.errorCode = e;

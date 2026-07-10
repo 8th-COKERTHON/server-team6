@@ -36,5 +36,11 @@ public class Episode extends BaseTimeEntity {
         this.matchedAt = matchedAt;
     }
 
+    public void restoreAvailable() {
+        if (status != Status.MATCHED) throw new IllegalStateException("Episode is not matched");
+        this.status = Status.AVAILABLE;
+        this.matchedAt = null;
+    }
+
     public enum Status { AVAILABLE, MATCHED, ARCHIVED }
 }
