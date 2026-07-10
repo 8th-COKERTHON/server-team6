@@ -6,7 +6,7 @@ import com.team6.server.global.exception.BusinessException;
 import com.team6.server.global.exception.ErrorCode;
 import com.team6.server.global.security.CurrentMemberProvider;
 import com.team6.server.match.dto.MatchRequestDto;
-import com.team6.server.match.dto.RingResponse;
+import com.team6.server.match.dto.RingResponseDto;
 import com.team6.server.match.entity.Match;
 import com.team6.server.match.repository.MatchRepository;
 import com.team6.server.match.repository.MatchingEventRepository;
@@ -27,20 +27,20 @@ public class MatchService {
     private final CurrentMemberProvider currentMember;
 
     @Transactional(readOnly = true)
-    public RingResponse getRingScreen(Authentication authentication) {
+    public RingResponseDto getRingScreen(Authentication authentication) {
         Long memberId = currentMember.require(authentication).getId();
         var activeEvents = matchingEventRepository.findByStatus("OPEN").stream()
-                .map(RingResponse.ActiveEventDto::from)
+                .map(RingResponseDto.ActiveEventDto::from)
                 .toList();
 
         var availableEpisodes = episodeRepository
                 .findAllByMemberIdAndStatusOrderByCreatedAtDescIdDesc(memberId, Episode.Status.AVAILABLE)
                 .stream()
-                .map(episode -> new RingResponse.AvailableEpisodeDto(
+                .map(episode -> new RingResponseDto.AvailableEpisodeDto(
                         episode.getId(), episode.getTitle(), episode.getEpisodeDate().toString()))
                 .toList();
 
-        return new RingResponse(null, availableEpisodes, null, activeEvents);
+        return new RingResponseDto(null, availableEpisodes, null, activeEvents);
     }
 
     @Transactional

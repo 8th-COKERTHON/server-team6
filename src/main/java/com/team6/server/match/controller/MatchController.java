@@ -2,7 +2,7 @@ package com.team6.server.match.controller;
 
 import com.team6.server.global.response.ApiResponse;
 import com.team6.server.match.dto.MatchRequestDto;
-import com.team6.server.match.dto.RingResponse;
+import com.team6.server.match.dto.RingResponseDto;
 import com.team6.server.match.service.MatchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,7 +28,7 @@ public class MatchController {
     @Operation(summary = "링 화면 조회 (메인·목록·대결)",
             description = "현재 열린 밸런스 질문, 대결 가능한 본인 기억 리스트, 진행 중인 대결 및 이벤트를 통합 조회합니다.")
     @GetMapping("/ring")
-    public ApiResponse<RingResponse> getRingScreen(Authentication authentication) {
+    public ApiResponse<RingResponseDto> getRingScreen(Authentication authentication) {
         return ApiResponse.success(matchService.getRingScreen(authentication));
     }
 

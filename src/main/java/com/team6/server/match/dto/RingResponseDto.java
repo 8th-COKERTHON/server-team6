@@ -1,10 +1,10 @@
 package com.team6.server.match.dto;
 
 import com.team6.server.match.entity.MatchingEvent;
-import java.time.LocalDateTime;
+
 import java.util.List;
 
-public record RingResponse (
+public record RingResponseDto(
         Object activeQuestion, // 밸런스 질문
         List<AvailableEpisodeDto> availableEpisodes, // 대결 가능한 내 기억들
         ActiveMatchDto activeMatch, // 진행 중인 대결
