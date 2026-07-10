@@ -8,6 +8,7 @@ import lombok.*;
  @Column(nullable=false) private String password;
  @Column(nullable=false,length=50) private String name;
  @Enumerated(EnumType.STRING) @Column(nullable=false,length=20) private Role role;
- public Member(String email,String password,String name){this.email=email;this.password=password;this.name=name;this.role=Role.USER;}
+ public Member(String email,String password,String name){this(email,password,name,Role.USER);}
+ public Member(String email,String password,String name,Role role){this.email=email;this.password=password;this.name=name;this.role=role;}
  public enum Role { USER,ADMIN }
 }
