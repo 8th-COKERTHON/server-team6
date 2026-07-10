@@ -9,10 +9,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team6.server.auth.repository.MemberRepository;
 import com.team6.server.global.security.JwtProvider;
 import com.team6.server.member.Member;
-import com.team6.server.episode.repository.EpisodeRankingRepository;
 import com.team6.server.episode.repository.EpisodeRepository;
 import java.time.LocalDate;
 import java.util.Map;
+import com.team6.server.ranking.repository.RankingEpisodeScoreRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +29,7 @@ class HomeEpisodeApiIntegrationTest {
     @Autowired ObjectMapper objectMapper;
     @Autowired MemberRepository members;
     @Autowired EpisodeRepository episodes;
-    @Autowired EpisodeRankingRepository rankings;
+    @Autowired RankingEpisodeScoreRepository rankings;
     @Autowired PasswordEncoder passwordEncoder;
     @Autowired JwtProvider jwtProvider;
 
@@ -110,7 +110,7 @@ class HomeEpisodeApiIntegrationTest {
                 .andExpect(jsonPath("$.data.title").value("저장 확인 제목"))
                 .andExpect(jsonPath("$.data.status").value("AVAILABLE"))
                 .andExpect(jsonPath("$.data.rankingPresent").value(true))
-                .andExpect(jsonPath("$.data.titleScore").value(0))
+                .andExpect(jsonPath("$.data.titleScore").value(1000))
                 .andExpect(jsonPath("$.data.rankingVersion").value(0));
     }
 

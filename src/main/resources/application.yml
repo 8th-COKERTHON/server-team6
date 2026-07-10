@@ -9,11 +9,13 @@ spring:
     password: ${DB_PASSWORD:team6}
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     open-in-view: false
   flyway:
-    enabled: true
+    enabled: false
     locations: classpath:db/migration
+    validate-on-migrate: false
+    baseline-on-migrate: true
 server:
   forward-headers-strategy: framework
 jwt:

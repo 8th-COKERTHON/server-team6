@@ -5,11 +5,11 @@ import com.team6.server.global.exception.BusinessException;
 import com.team6.server.global.exception.ErrorCode;
 import com.team6.server.global.security.CurrentMemberProvider;
 import com.team6.server.episode.Episode;
-import com.team6.server.episode.EpisodeRanking;
 import com.team6.server.episode.dto.*;
-import com.team6.server.episode.repository.EpisodeRankingRepository;
 import com.team6.server.episode.repository.EpisodeRepository;
 import com.team6.server.member.Member;
+import com.team6.server.ranking.entity.RankingEpisodeScore;
+import com.team6.server.ranking.repository.RankingEpisodeScoreRepository;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.function.Function;
@@ -24,13 +24,13 @@ import org.springframework.transaction.annotation.Propagation;
 @Transactional
 public class EpisodeService {
     private final EpisodeRepository episodes;
-    private final EpisodeRankingRepository rankings;
+    private final RankingEpisodeScoreRepository rankings;
     private final CurrentMemberProvider currentMember;
     private final TitleSuggestionProvider titleSuggestions;
     private final Clock clock;
     private final EpisodeCursorCodec cursors;
 
-    public EpisodeService(EpisodeRepository episodes, EpisodeRankingRepository rankings,
+    public EpisodeService(EpisodeRepository episodes, RankingEpisodeScoreRepository rankings,
                          CurrentMemberProvider currentMember, TitleSuggestionProvider titleSuggestions, Clock clock,
                          EpisodeCursorCodec cursors) {
         this.episodes = episodes;
@@ -47,10 +47,10 @@ public class EpisodeService {
             throw new BusinessException(ErrorCode.INVALID_EPISODE_DATE);
         }
         var episode = episodes.save(new Episode(member, request.title().strip(), request.content().strip(), request.episodeDate()));
-        rankings.save(new EpisodeRanking(episode));
+        rankings.save(RankingEpisodeScore.initial(episode.getId()));
         episodes.flush();
         long availableCount = episodes.countByMemberIdAndStatus(member.getId(), Episode.Status.AVAILABLE);
-        return new CreateEpisodeResponse(episode.getId(), episode.getStatus().name(), 0, null,
+        return new CreateEpisodeResponse(episode.getId(), episode.getStatus().name(), RankingEpisodeScore.INITIAL_SCORE, null,
                 availableCount, false, episode.getCreatedAt());
     }
 
@@ -90,7 +90,7 @@ public class EpisodeService {
         boolean hasNext = page.size() > size;
         var selected = hasNext ? page.subList(0, size) : page;
         var rankingMap = rankings.findAllById(selected.stream().map(Episode::getId).toList()).stream()
-                .collect(Collectors.toMap(EpisodeRanking::getEpisodeId, Function.identity()));
+                .collect(Collectors.toMap(RankingEpisodeScore::getEpisodeId, Function.identity()));
         var items = selected.stream().map(episode -> {
             var ranking = rankingMap.get(episode.getId());
             return new EpisodeListItemResponse(episode.getId(), episode.getTitle(), preview(episode.getContent()),
