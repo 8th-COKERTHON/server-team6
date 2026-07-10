@@ -1,9 +1,8 @@
 package com.team6.server.match.dto;
 
-import lombok.Getter;
+import jakarta.validation.constraints.NotNull;
 
-@Getter
-public class MatchRequestDto {
-    private Long episodeAId;
-    private Long episodeBId;
-}
+public record MatchRequestDto(
+        @NotNull Long episodeAId,
+        @NotNull Long episodeBId
+) {}
