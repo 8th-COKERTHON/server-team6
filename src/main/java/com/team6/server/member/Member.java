@@ -9,10 +9,14 @@ import java.time.LocalDateTime;
  @Column(nullable=false) private String password;
  @Column(nullable=false,length=50) private String name;
  @Enumerated(EnumType.STRING) @Column(nullable=false,length=20) private Role role;
+ @Enumerated(EnumType.STRING) @Column(name="onboarding_status",nullable=false,length=30) private OnboardingStatus onboardingStatus;
  @Column(name="onboarding_completed_at") private LocalDateTime onboardingCompletedAt;
  public Member(String email,String password,String name){this(email,password,name,Role.USER);}
- public Member(String email,String password,String name,Role role){this.email=email;this.password=password;this.name=name;this.role=role;}
- public boolean isOnboardingCompleted(){return onboardingCompletedAt!=null;}
- public void completeOnboarding(LocalDateTime completedAt){if(onboardingCompletedAt==null)this.onboardingCompletedAt=completedAt;}
+ public Member(String email,String password,String name,Role role){this.email=email;this.password=password;this.name=name;this.role=role;this.onboardingStatus=OnboardingStatus.NOT_STARTED;}
+ public boolean isOnboardingCompleted(){return onboardingStatus==OnboardingStatus.COMPLETED;}
+ public void startEpisodeRegistration(){if(onboardingStatus==OnboardingStatus.NOT_STARTED)this.onboardingStatus=OnboardingStatus.EPISODE_REGISTERING;}
+ public void startPlacement(){if(onboardingStatus==OnboardingStatus.NOT_STARTED||onboardingStatus==OnboardingStatus.EPISODE_REGISTERING)this.onboardingStatus=OnboardingStatus.PLACEMENT_IN_PROGRESS;}
+ public void completeOnboarding(LocalDateTime completedAt){if(onboardingStatus!=OnboardingStatus.COMPLETED){this.onboardingStatus=OnboardingStatus.COMPLETED;this.onboardingCompletedAt=completedAt;}}
  public enum Role { USER,ADMIN }
+ public enum OnboardingStatus { NOT_STARTED,EPISODE_REGISTERING,PLACEMENT_IN_PROGRESS,COMPLETED }
 }

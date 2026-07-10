@@ -11,6 +11,10 @@ import com.team6.server.match.dto.RingResponseDto;
 import com.team6.server.match.entity.Match;
 import com.team6.server.match.repository.MatchRepository;
 import com.team6.server.match.repository.MatchingEventRepository;
+import com.team6.server.match.repository.ShowSessionRepository;
+import com.team6.server.auth.repository.MemberRepository;
+import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -32,6 +36,9 @@ public class MatchService {
     private final EpisodeRepository episodeRepository;
     private final MatchRepository matchRepository;
     private final CurrentMemberProvider currentMember;
+    private final ShowSessionRepository showSessionRepository;
+    private final MemberRepository memberRepository;
+    private final Clock clock;
 
     private final RankingEpisodeScoreRepository episodeRankingRepository;
     private final RankingScoreEventRepository rankingScoreEventRepository;
@@ -77,6 +84,10 @@ public class MatchService {
                 || episodeB.getStatus() != Episode.Status.AVAILABLE) {
             throw new BusinessException(ErrorCode.EPISODE_ALREADY_MATCHED);
         }
+        if (episodeA.getPlacementStatus() == Episode.PlacementStatus.IN_PROGRESS
+                || episodeB.getPlacementStatus() == Episode.PlacementStatus.IN_PROGRESS) {
+            throw new BusinessException(ErrorCode.EPISODE_ALREADY_MATCHED);
+        }
 
         LocalDateTime startedAt = LocalDateTime.now();
         episodeA.markMatched(startedAt);
@@ -86,6 +97,7 @@ public class MatchService {
                 .memberId(memberId)
                 .episodeAId(episodeA.getId())
                 .episodeBId(episodeB.getId())
+                .matchType("GENERAL")
                 .status("IN_PROGRESS")
                 .startedAt(startedAt)
                 .build();
@@ -102,6 +114,9 @@ public class MatchService {
         }
         if (!"IN_PROGRESS".equals(match.getStatus())) {
             throw new BusinessException(ErrorCode.MATCH_ALREADY_COMPLETED);
+        }
+        if (match.getSessionId() != null) {
+            throw new BusinessException(ErrorCode.RING_ROUND_OUT_OF_ORDER, "Show 경기는 취소할 수 없습니다.");
         }
 
         List<Episode> episodes = episodeRepository.findAllByIdWithPessimisticLock(
@@ -148,6 +163,15 @@ public class MatchService {
         if (!winnerId.equals(match.getEpisodeAId()) && !winnerId.equals(match.getEpisodeBId())) {
             throw new BusinessException(ErrorCode.INVALID_MATCH_RESULT);
         }
+        if (match.getSessionId() != null) {
+            Long nextMatchId = matchRepository.findFirstBySessionIdAndStatusOrderByMatchOrderAsc(
+                            match.getSessionId(), "IN_PROGRESS")
+                    .map(Match::getId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.RING_SESSION_NOT_FOUND));
+            if (!nextMatchId.equals(matchId)) {
+                throw new BusinessException(ErrorCode.RING_ROUND_OUT_OF_ORDER);
+            }
+        }
 
         // 점수 원장 기록 - 중복 지급 방지용 멱등 키 적용
         String winnerEventKey = "MATCH_" + matchId + "_WINNER";
@@ -160,7 +184,15 @@ public class MatchService {
         Long loserId = winnerId.equals(match.getEpisodeAId()) ? match.getEpisodeBId() : match.getEpisodeAId();
         RankingEpisodeScore winnerRanking = findOrCreateRanking(winnerId);
         RankingEpisodeScore loserRanking = findOrCreateRanking(loserId);
-        ScoreDelta scoreDelta = calculateScoreDelta(winnerRanking.getTitleScore(), loserRanking.getTitleScore());
+        long winnerScoreBefore = winnerRanking.getTitleScore();
+        long loserScoreBefore = loserRanking.getTitleScore();
+        ScoreDelta baseDelta = calculateScoreDelta(winnerScoreBefore, loserScoreBefore);
+        BigDecimal multiplier = match.getSessionId() == null ? BigDecimal.ONE
+                : showSessionRepository.findByIdWithPessimisticLock(match.getSessionId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.RING_SESSION_NOT_FOUND)).getScoreMultiplier();
+        ScoreDelta scoreDelta = new ScoreDelta(
+                multiplier.multiply(BigDecimal.valueOf(baseDelta.winnerDelta())).longValueExact(),
+                multiplier.multiply(BigDecimal.valueOf(baseDelta.loserDelta())).longValueExact());
 
         winnerRanking.applyDelta(scoreDelta.winnerDelta());
         loserRanking.applyDelta(scoreDelta.loserDelta());
@@ -170,6 +202,7 @@ public class MatchService {
         episodeRankingRepository.save(winnerRanking);
         episodeRankingRepository.save(loserRanking);
 
+        LocalDateTime completedAt = LocalDateTime.now(clock);
         com.team6.server.ranking.entity.RankingScoreEvent winnerScoreEvent = com.team6.server.ranking.entity.RankingScoreEvent.builder()
                 .eventKey(winnerEventKey)
                 .episodeId(winnerId)
@@ -177,7 +210,7 @@ public class MatchService {
                 .delta(scoreDelta.winnerDelta())
                 .sourceType("MATCH_COMPLETED")
                 .sourceId(matchId)
-                .occurredAt(LocalDateTime.now())
+                .occurredAt(completedAt)
                 .build();
         rankingScoreEventRepository.save(winnerScoreEvent);
 
@@ -188,12 +221,40 @@ public class MatchService {
                 .delta(scoreDelta.loserDelta())
                 .sourceType("MATCH_COMPLETED")
                 .sourceId(matchId)
-                .occurredAt(LocalDateTime.now())
+                .occurredAt(completedAt)
                 .build();
         rankingScoreEventRepository.save(loserScoreEvent);
 
-        match.complete(winnerId);
-        restoreMatchedEpisodes(match);
+        boolean winnerIsEpisodeA = winnerId.equals(match.getEpisodeAId());
+        long episodeAScoreBefore = winnerIsEpisodeA ? winnerScoreBefore : loserScoreBefore;
+        long episodeBScoreBefore = winnerIsEpisodeA ? loserScoreBefore : winnerScoreBefore;
+        long episodeAScoreAfter = winnerIsEpisodeA ? winnerRanking.getTitleScore() : loserRanking.getTitleScore();
+        long episodeBScoreAfter = winnerIsEpisodeA ? loserRanking.getTitleScore() : winnerRanking.getTitleScore();
+        match.complete(winnerId, loserId, episodeAScoreBefore, episodeBScoreBefore,
+                episodeAScoreAfter, episodeBScoreAfter, scoreDelta.winnerDelta(), scoreDelta.loserDelta(), completedAt);
+        if (match.getSessionId() == null) {
+            restoreMatchedEpisodes(match);
+        } else {
+            var session = showSessionRepository.findByIdWithPessimisticLock(match.getSessionId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.RING_SESSION_NOT_FOUND));
+            boolean sessionCompleted = session.completeRound(completedAt);
+            if (sessionCompleted) {
+                if (PlacementService.ONBOARDING.equals(session.getSessionType())) {
+                    matchRepository.findBySessionIdOrderByMatchOrderAsc(session.getId()).stream()
+                            .flatMap(item -> java.util.stream.Stream.of(item.getEpisodeAId(), item.getEpisodeBId()))
+                            .distinct().sorted().map(episodeRepository::findById)
+                            .map(optional -> optional.orElseThrow(() -> new BusinessException(ErrorCode.EPISODE_NOT_FOUND)))
+                            .forEach(Episode::completePlacement);
+                    memberRepository.findWithLockById(memberId)
+                            .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND))
+                            .completeOnboarding(completedAt);
+                } else if (PlacementService.ADDITIONAL.equals(session.getSessionType())) {
+                    episodeRepository.findById(session.getPrimaryEpisodeId())
+                            .orElseThrow(() -> new BusinessException(ErrorCode.EPISODE_NOT_FOUND))
+                            .completePlacement();
+                }
+            }
+        }
 
         return com.team6.server.match.dto.MatchResultResponseDto.builder()
                 .matchId(match.getId())

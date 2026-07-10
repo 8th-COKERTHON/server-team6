@@ -1,8 +1,10 @@
 package com.team6.server.episode.service;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(prefix = "openai.title-suggestion", name = "enabled", havingValue = "false", matchIfMissing = true)
 public class LocalTitleSuggestionProvider implements TitleSuggestionProvider {
     private static final int PREVIEW_LENGTH = 30;
 

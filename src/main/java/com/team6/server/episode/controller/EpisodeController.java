@@ -40,11 +40,13 @@ public class EpisodeController {
     }
 
     @PostMapping("/title-suggestions")
-    @Operation(summary = "에피소드 제목 제안", description = "입력한 내용에서 제목 하나를 생성합니다. 현재 구현은 로컬 제목 제안기를 사용합니다.")
+    @Operation(summary = "에피소드 제목 제안", description = "입력한 내용에서 한국어 제목 하나를 생성합니다. 생성 결과는 저장되지 않으며 재생성을 위해 반복 호출할 수 있습니다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "생성 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "GLOBAL_400_1(읽을 수 없는 JSON), GLOBAL_400_2(필드 검증 실패)"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패: AUTH_401_1, AUTH_401_2, AUTH_401_4")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패: AUTH_401_1, AUTH_401_2, AUTH_401_4"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "502", description = "AI_502_1(빈 출력 또는 해석할 수 없는 응답)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503", description = "AI_503_1(timeout, 사용량 제한 또는 외부 서비스 장애)")
     })
     public ApiResponse<TitleSuggestionResponse> suggestTitle(@Valid @RequestBody TitleSuggestionRequest request,
                                                               Authentication authentication) {

@@ -20,6 +20,8 @@ public class Episode extends BaseTimeEntity {
     @Column(nullable = false, columnDefinition = "TEXT") private String content;
     @Column(name = "episode_date", nullable = false) private LocalDate episodeDate;
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 20) private Status status;
+    @Enumerated(EnumType.STRING) @Column(name = "placement_status", nullable = false, length = 20)
+    private PlacementStatus placementStatus;
     @Column(name = "matched_at") private LocalDateTime matchedAt;
 
     public Episode(Member member, String title, String content, LocalDate episodeDate) {
@@ -28,6 +30,7 @@ public class Episode extends BaseTimeEntity {
         this.content = content;
         this.episodeDate = episodeDate;
         this.status = Status.AVAILABLE;
+        this.placementStatus = PlacementStatus.PENDING;
     }
 
     public void markMatched(LocalDateTime matchedAt) {
@@ -42,5 +45,16 @@ public class Episode extends BaseTimeEntity {
         this.matchedAt = null;
     }
 
+    public void startPlacement() {
+        if (placementStatus != PlacementStatus.PENDING) throw new IllegalStateException("Episode placement is not pending");
+        placementStatus = PlacementStatus.IN_PROGRESS;
+    }
+
+    public void completePlacement() {
+        if (placementStatus != PlacementStatus.IN_PROGRESS) throw new IllegalStateException("Episode placement is not in progress");
+        placementStatus = PlacementStatus.COMPLETED;
+    }
+
     public enum Status { AVAILABLE, MATCHED, ARCHIVED }
+    public enum PlacementStatus { PENDING, IN_PROGRESS, COMPLETED }
 }

@@ -2,6 +2,7 @@ package com.team6.server.member.controller;
 
 import com.team6.server.global.response.ApiResponse;
 import com.team6.server.member.dto.MemberMeResponse;
+import com.team6.server.member.dto.OnboardingStatusResponse;
 import com.team6.server.member.service.MemberService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,6 +32,17 @@ public class MemberController {
     })
     public ApiResponse<MemberMeResponse> getMe(Authentication authentication) {
         return ApiResponse.success(service.getMe(authentication));
+    }
+
+    @GetMapping("/status")
+    @Operation(summary = "온보딩 진행 상태 조회", description = "서버가 관리하는 온보딩 상태와 등록 에피소드 및 배치전 진행 수를 조회합니다. 배치전 기능이 활성화되기 전에는 경기 수가 0입니다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패: AUTH_401_1, AUTH_401_2, AUTH_401_4"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "토큰의 회원을 찾을 수 없음: MEMBER_404_1")
+    })
+    public ApiResponse<OnboardingStatusResponse> getOnboardingStatus(Authentication authentication) {
+        return ApiResponse.success(service.getOnboardingStatus(authentication));
     }
 
     @PostMapping("/onboarding/complete")

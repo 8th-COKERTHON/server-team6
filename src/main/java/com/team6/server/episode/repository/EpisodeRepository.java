@@ -13,6 +13,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface EpisodeRepository extends JpaRepository<Episode, Long> {
+    long countByMemberId(Long memberId);
+
     long countByMemberIdAndStatus(Long memberId, Episode.Status status);
 
     Optional<Episode> findFirstByMemberIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDescIdDesc(
@@ -38,6 +40,36 @@ public interface EpisodeRepository extends JpaRepository<Episode, Long> {
     List<Episode> findAvailableForUpdate(@Param("memberId") Long memberId,
                                          @Param("status") Episode.Status status,
                                          Pageable pageable);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select e from Episode e where e.member.id = :memberId and e.status = :status and e.placementStatus = :placementStatus order by e.createdAt asc, e.id asc")
+    List<Episode> findReadyForShowForUpdate(@Param("memberId") Long memberId,
+                                            @Param("status") Episode.Status status,
+                                            @Param("placementStatus") Episode.PlacementStatus placementStatus,
+                                            Pageable pageable);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select e from Episode e where e.member.id = :memberId and e.status = :status and e.placementStatus = :placementStatus order by e.createdAt asc, e.id asc")
+    List<Episode> findOnboardingCandidatesForUpdate(@Param("memberId") Long memberId,
+                                                    @Param("status") Episode.Status status,
+                                                    @Param("placementStatus") Episode.PlacementStatus placementStatus,
+                                                    Pageable pageable);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select e from Episode e join RankingEpisodeScore r on r.episodeId = e.id
+            where e.member.id = :memberId
+              and e.id <> :targetEpisodeId
+              and e.status = :status
+              and e.placementStatus = :placementStatus
+            order by abs(r.titleScore - :targetScore), e.id
+            """)
+    List<Episode> findPlacementOpponentsForUpdate(@Param("memberId") Long memberId,
+                                                  @Param("targetEpisodeId") Long targetEpisodeId,
+                                                  @Param("targetScore") long targetScore,
+                                                  @Param("status") Episode.Status status,
+                                                  @Param("placementStatus") Episode.PlacementStatus placementStatus,
+                                                  Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select e from Episode e where e.id in :episodeIds order by e.id asc")

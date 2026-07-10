@@ -15,6 +15,12 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 
     List<Match> findByMatchingEventId(Long eventId);
 
+    long countBySessionIdAndStatus(Long sessionId, String status);
+
+    List<Match> findBySessionIdOrderByMatchOrderAsc(Long sessionId);
+
+    Optional<Match> findFirstBySessionIdAndStatusOrderByMatchOrderAsc(Long sessionId, String status);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select m from Match m where m.id = :id")
     Optional<Match> findByIdWithPessimisticLock(Long id);
