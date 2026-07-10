@@ -17,6 +17,9 @@ public enum ErrorCode {
     CONFLICT(HttpStatus.CONFLICT, "GLOBAL_409_1", "요청이 현재 상태와 충돌합니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "GLOBAL_500_1", "서버 내부 오류가 발생했습니다."),
 
+    AI_INVALID_RESPONSE(HttpStatus.BAD_GATEWAY, "AI_502_1", "AI 제목 생성 응답을 처리할 수 없습니다."),
+    AI_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI_503_1", "AI 제목 생성 서비스를 일시적으로 사용할 수 없습니다."),
+
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_401_1", "유효하지 않은 토큰입니다."),
     EXPIRED_ACCESS_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_401_2", "액세스 토큰이 만료되었습니다."),
     EXPIRED_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_401_3", "리프레시 토큰이 만료되었습니다."),

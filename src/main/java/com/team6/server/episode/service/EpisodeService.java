@@ -44,6 +44,7 @@ public class EpisodeService {
 
     public CreateEpisodeResponse create(CreateEpisodeRequest request, Authentication authentication) {
         var member = currentMember.require(authentication);
+        member.startEpisodeRegistration();
         if (request.episodeDate().isAfter(LocalDate.now(clock.withZone(TimeConfig.SERVICE_ZONE)))) {
             throw new BusinessException(ErrorCode.INVALID_EPISODE_DATE);
         }
