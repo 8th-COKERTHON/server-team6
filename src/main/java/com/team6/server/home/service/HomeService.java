@@ -5,10 +5,10 @@ import com.team6.server.global.security.CurrentMemberProvider;
 import com.team6.server.home.dto.*;
 import com.team6.server.matching.MatchingEvent;
 import com.team6.server.matching.repository.MatchingEventRepository;
-import com.team6.server.matching.MemoryMatch;
-import com.team6.server.matching.repository.MemoryMatchRepository;
-import com.team6.server.memory.Memory;
-import com.team6.server.memory.repository.MemoryRepository;
+import com.team6.server.matching.EpisodeMatch;
+import com.team6.server.matching.repository.EpisodeMatchRepository;
+import com.team6.server.episode.Episode;
+import com.team6.server.episode.repository.EpisodeRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -20,15 +20,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional(readOnly = true)
 public class HomeService {
-    private final MemoryRepository memories;
+    private final EpisodeRepository episodes;
     private final MatchingEventRepository events;
     private final CurrentMemberProvider currentMember;
     private final Clock clock;
-    private final MemoryMatchRepository matches;
+    private final EpisodeMatchRepository matches;
 
-    public HomeService(MemoryRepository memories, MatchingEventRepository events,
-                       CurrentMemberProvider currentMember, Clock clock, MemoryMatchRepository matches) {
-        this.memories = memories;
+    public HomeService(EpisodeRepository episodes, MatchingEventRepository events,
+                       CurrentMemberProvider currentMember, Clock clock, EpisodeMatchRepository matches) {
+        this.episodes = episodes;
         this.events = events;
         this.currentMember = currentMember;
         this.clock = clock;
@@ -40,12 +40,12 @@ public class HomeService {
         var zone = TimeConfig.SERVICE_ZONE;
         var now = LocalDateTime.now(clock.withZone(zone));
         var today = now.toLocalDate();
-        long count = memories.countByMemberIdAndStatus(member.getId(), Memory.Status.AVAILABLE);
-        var todayMemory = memories
+        long count = episodes.countByMemberIdAndStatus(member.getId(), Episode.Status.AVAILABLE);
+        var todayEpisode = episodes
                 .findFirstByMemberIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDescIdDesc(
                         member.getId(), today.atStartOfDay(), today.plusDays(1).atStartOfDay())
-                .map(memory -> new TodayMemoryResponse(memory.getId(), memory.getTitle(), memory.getMemoryDate(),
-                        memory.getCreatedAt().atZone(zone).toOffsetDateTime()))
+                .map(episode -> new TodayEpisodeResponse(episode.getId(), episode.getTitle(), episode.getEpisodeDate(),
+                        episode.getCreatedAt().atZone(zone).toOffsetDateTime()))
                 .orElse(null);
         var upcoming = events.findByStatusAndStartsAtAfterOrderByStartsAtAscIdAsc(
                         MatchingEvent.Status.SCHEDULED, now, PageRequest.of(0, 5)).stream()
@@ -54,7 +54,7 @@ public class HomeService {
                         event.getEndsAt().atZone(zone).toOffsetDateTime(),
                         ChronoUnit.DAYS.between(today, event.getStartsAt().toLocalDate()), event.getScoreReward()))
                 .toList();
-        boolean hasActiveMatch = matches.existsByMemberIdAndStatus(member.getId(), MemoryMatch.Status.IN_PROGRESS);
-        return new HomeResponse(today, count, count >= 2 && !hasActiveMatch, todayMemory, upcoming);
+        boolean hasActiveMatch = matches.existsByMemberIdAndStatus(member.getId(), EpisodeMatch.Status.IN_PROGRESS);
+        return new HomeResponse(today, count, count >= 2 && !hasActiveMatch, todayEpisode, upcoming);
     }
 }

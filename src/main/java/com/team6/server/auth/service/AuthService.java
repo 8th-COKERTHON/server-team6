@@ -43,7 +43,8 @@ public class AuthService {
         }
         var tokens = tokens(member);
         return new LoginResponse(tokens.accessToken(), tokens.refreshToken(), tokens.tokenType(),
-                tokens.expiresIn(), member.getName(), member.getEmail());
+                tokens.expiresIn(), member.getName(), member.getEmail(), member.isOnboardingCompleted(),
+                member.getOnboardingCompletedAt());
     }
 
     @Transactional(readOnly = true)

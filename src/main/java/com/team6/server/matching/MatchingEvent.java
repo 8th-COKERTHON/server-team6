@@ -20,15 +20,22 @@ public class MatchingEvent extends BaseTimeEntity {
     @Column(name = "ends_at", nullable = false) private LocalDateTime endsAt;
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 20) private Status status;
     @Column(name = "score_reward", nullable = false) private long scoreReward;
+    @Column(name = "round_count", nullable = false) private int roundCount;
 
     public MatchingEvent(Type eventType, String title, LocalDateTime startsAt, LocalDateTime endsAt,
                          Status status, long scoreReward) {
+        this(eventType, title, startsAt, endsAt, status, scoreReward, 5);
+    }
+
+    public MatchingEvent(Type eventType, String title, LocalDateTime startsAt, LocalDateTime endsAt,
+                         Status status, long scoreReward, int roundCount) {
         this.eventType = eventType;
         this.title = title;
         this.startsAt = startsAt;
         this.endsAt = endsAt;
         this.status = status;
         this.scoreReward = scoreReward;
+        this.roundCount = roundCount;
     }
 
     public enum Type { WEEKLY, MONTHLY, SPECIAL }
