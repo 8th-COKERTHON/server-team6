@@ -1,5 +1,6 @@
 package com.team6.server.matching;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -8,16 +9,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team6.server.auth.repository.MemberRepository;
 import com.team6.server.episode.Episode;
-import com.team6.server.episode.EpisodeRanking;
-import com.team6.server.episode.repository.EpisodeRankingRepository;
 import com.team6.server.episode.repository.EpisodeRepository;
 import com.team6.server.global.security.JwtProvider;
-import com.team6.server.matching.repository.*;
 import com.team6.server.member.Member;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.Map;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,115 +32,104 @@ class RingApiIntegrationTest {
     @Autowired ObjectMapper objectMapper;
     @Autowired MemberRepository members;
     @Autowired EpisodeRepository episodes;
-    @Autowired EpisodeRankingRepository rankings;
-    @Autowired MatchingEventRepository events;
-    @Autowired RingSessionRepository sessions;
-    @Autowired EpisodeMatchRepository matches;
-    @Autowired RankingScoreEventRepository scoreEvents;
     @Autowired PasswordEncoder passwordEncoder;
     @Autowired JwtProvider jwtProvider;
 
     private Member member;
     private String token;
-    private MatchingEvent event;
 
     @BeforeEach
     void setUp() {
-        clean();
-        member = members.save(new Member("ring@example.com", passwordEncoder.encode("password123!"), "링 사용자"));
+        member = members.save(new Member(
+                "ring-" + System.nanoTime() + "@example.com",
+                passwordEncoder.encode("password123!"), "링 사용자"));
         token = jwtProvider.createAccessToken(member.getId(), member.getRole().name());
-        var now = LocalDateTime.now();
-        event = events.save(new MatchingEvent(MatchingEvent.Type.WEEKLY, "Monday Night Rivals",
-                now.minusHours(1), now.plusHours(1), MatchingEvent.Status.OPEN, 10, 2));
-        for (int i = 1; i <= 4; i++) {
-            var episode = episodes.save(new Episode(member, "에피소드 " + i, "에피소드 내용 " + i, LocalDate.now()));
-            rankings.save(new EpisodeRanking(episode));
-        }
-    }
-
-    @AfterEach
-    void tearDown() { clean(); }
-
-    @Test
-    void completesRoundsInOrderAndAwardsEachWinnerOnce() throws Exception {
-        mockMvc.perform(get("/api/v1/ring/events").header("Authorization", bearer()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.items[0].participationStatus").value("AVAILABLE"))
-                .andExpect(jsonPath("$.data.items[0].roundCount").value(2));
-
-        String started = mockMvc.perform(post("/api/v1/ring/sessions")
-                        .header("Authorization", bearer()).contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of("eventId", event.getId()))))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.currentRound.roundNo").value(1))
-                .andReturn().getResponse().getContentAsString();
-        var data = objectMapper.readTree(started).path("data");
-        long sessionId = data.path("sessionId").asLong();
-        long firstWinner = data.path("currentRound").path("episodeA").path("episodeId").asLong();
-
-        mockMvc.perform(post("/api/v1/ring/sessions")
-                        .header("Authorization", bearer()).contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of("eventId", event.getId()))))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("MATCH_409_2"));
-        select(sessionId, 1, 999999L).andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("MATCH_400_1"));
-
-        select(sessionId, 2, firstWinner).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("MATCH_409_3"));
-
-        String firstResult = select(sessionId, 1, firstWinner)
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.winnerTitleScore").value(10))
-                .andExpect(jsonPath("$.data.nextRound.roundNo").value(2))
-                .andReturn().getResponse().getContentAsString();
-        long secondWinner = objectMapper.readTree(firstResult).path("data").path("nextRound")
-                .path("episodeA").path("episodeId").asLong();
-
-        select(sessionId, 1, firstWinner).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("MATCH_409_3"));
-        select(sessionId, 2, secondWinner).andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.sessionStatus").value("COMPLETED"))
-                .andExpect(jsonPath("$.data.completedRounds").value(2))
-                .andExpect(jsonPath("$.data.nextRound").doesNotExist());
-
-        mockMvc.perform(get("/api/v1/ring/sessions/{id}", sessionId).header("Authorization", bearer()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("COMPLETED"))
-                .andExpect(jsonPath("$.data.totalScoreAwarded").value(20));
     }
 
     @Test
-    void rejectsInsufficientEpisodesAndHidesAnotherMembersSession() throws Exception {
-        mockMvc.perform(get("/api/v1/ring/events")).andExpect(status().isUnauthorized());
-        rankings.deleteAll();
-        episodes.deleteAll();
-        mockMvc.perform(post("/api/v1/ring/sessions").header("Authorization", bearer())
+    void ringRequiresAuthenticationAndListsAvailableEpisodes() throws Exception {
+        episodes.save(new Episode(member, "첫 번째", "첫 번째 내용", LocalDate.now()));
+        Episode matched = episodes.save(new Episode(member, "매칭됨", "매칭된 내용", LocalDate.now()));
+        matched.markMatched(java.time.LocalDateTime.now());
+
+        mockMvc.perform(get("/api/v1/ring"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/v1/ring").header("Authorization", bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.availableEpisodes.length()").value(1))
+                .andExpect(jsonPath("$.data.availableEpisodes[0].title").value("첫 번째"));
+    }
+
+    @Test
+    void startsMatchRejectsReuseAndCancelRestoresEpisodes() throws Exception {
+        Episode first = episodes.save(new Episode(member, "첫 번째", "첫 번째 내용", LocalDate.now()));
+        Episode second = episodes.save(new Episode(member, "두 번째", "두 번째 내용", LocalDate.now()));
+
+        String response = mockMvc.perform(post("/api/v1/matches")
+                        .header("Authorization", bearer())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of("eventId", event.getId()))))
+                        .content(matchRequest(first.getId(), second.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andReturn().getResponse().getContentAsString();
+        long matchId = objectMapper.readTree(response).path("data").asLong();
+
+        mockMvc.perform(post("/api/v1/matches")
+                        .header("Authorization", bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(matchRequest(first.getId(), second.getId())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("EPISODE_409_2"));
+
+        mockMvc.perform(delete("/api/v1/matches/{matchId}", matchId)
+                        .header("Authorization", bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        mockMvc.perform(get("/api/v1/ring").header("Authorization", bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.availableEpisodes.length()").value(2));
+    }
+
+    @Test
+    void rejectsSameEpisodeMissingInputAndAnotherMembersEpisode() throws Exception {
+        Episode own = episodes.save(new Episode(member, "본인", "본인 내용", LocalDate.now()));
+        Member another = members.save(new Member(
+                "another-" + System.nanoTime() + "@example.com",
+                passwordEncoder.encode("password123!"), "다른 사용자"));
+        Episode others = episodes.save(new Episode(another, "타인", "타인 내용", LocalDate.now()));
+
+        mockMvc.perform(post("/api/v1/matches")
+                        .header("Authorization", bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(matchRequest(own.getId(), own.getId())))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("MATCH_400_3"));
+                .andExpect(jsonPath("$.code").value("MATCH_400_2"));
 
-        mockMvc.perform(get("/api/v1/ring/sessions/999999").header("Authorization", bearer()))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("MATCH_404_3"));
+        mockMvc.perform(post("/api/v1/matches")
+                        .header("Authorization", bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("episodeAId", own.getId()))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("GLOBAL_400_2"));
+
+        mockMvc.perform(post("/api/v1/matches")
+                        .header("Authorization", bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(matchRequest(own.getId(), others.getId())))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("GLOBAL_403_1"));
     }
 
-    private org.springframework.test.web.servlet.ResultActions select(long sessionId, int round, long winner) throws Exception {
-        return mockMvc.perform(post("/api/v1/ring/sessions/{sessionId}/rounds/{round}/result", sessionId, round)
-                .header("Authorization", bearer()).contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(Map.of("winnerEpisodeId", winner))));
+    private String matchRequest(Long episodeAId, Long episodeBId) throws Exception {
+        return objectMapper.writeValueAsString(Map.of(
+                "episodeAId", episodeAId,
+                "episodeBId", episodeBId));
     }
 
-    private void clean() {
-        scoreEvents.deleteAll();
-        matches.deleteAll();
-        sessions.deleteAll();
-        rankings.deleteAll();
-        episodes.deleteAll();
-        events.deleteAll();
-        members.deleteAll();
+    private String bearer() {
+        return "Bearer " + token;
     }
-
-    private String bearer() { return "Bearer " + token; }
 }

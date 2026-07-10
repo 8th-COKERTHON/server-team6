@@ -17,9 +17,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@Transactional
 class MemberOnboardingApiIntegrationTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
@@ -32,8 +34,7 @@ class MemberOnboardingApiIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        members.deleteAll();
-        email = "onboarding@example.com";
+        email = "onboarding-" + System.nanoTime() + "@example.com";
         var member = members.save(new Member(email, passwordEncoder.encode("password123!"), "온보딩 사용자"));
         bearer = "Bearer " + jwtProvider.createAccessToken(member.getId(), member.getRole().name());
     }
