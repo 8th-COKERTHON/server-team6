@@ -17,6 +17,9 @@ public enum ErrorCode {
     CONFLICT(HttpStatus.CONFLICT, "GLOBAL_409_1", "요청이 현재 상태와 충돌합니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "GLOBAL_500_1", "서버 내부 오류가 발생했습니다."),
 
+    AI_INVALID_RESPONSE(HttpStatus.BAD_GATEWAY, "AI_502_1", "AI 제목 생성 응답을 처리할 수 없습니다."),
+    AI_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI_503_1", "AI 제목 생성 서비스를 일시적으로 사용할 수 없습니다."),
+
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_401_1", "유효하지 않은 토큰입니다."),
     EXPIRED_ACCESS_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_401_2", "액세스 토큰이 만료되었습니다."),
     EXPIRED_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_401_3", "리프레시 토큰이 만료되었습니다."),
@@ -32,17 +35,21 @@ public enum ErrorCode {
     CURRENT_PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "MEMBER_400_2", "현재 비밀번호가 일치하지 않습니다."),
     MEMBER_ALREADY_WITHDRAWN(HttpStatus.CONFLICT, "MEMBER_409_4", "이미 탈퇴한 회원입니다."),
 
-    MEMORY_NOT_FOUND(HttpStatus.NOT_FOUND, "MEMORY_404_1", "기억을 찾을 수 없습니다."),
-    INVALID_MEMORY_DATE(HttpStatus.BAD_REQUEST, "MEMORY_400_1", "기억의 날짜가 올바르지 않습니다."),
-    PLACEMENT_ALREADY_COMPLETED(HttpStatus.CONFLICT, "MEMORY_409_1", "이미 배치전을 완료했습니다."),
-    INSUFFICIENT_PLACEMENT_MEMORIES(HttpStatus.BAD_REQUEST, "MEMORY_400_2", "배치전에 필요한 기억이 부족합니다."),
-    MEMORY_ALREADY_MATCHED(HttpStatus.CONFLICT, "MEMORY_409_2", "이미 해당 기억과 매치를 진행했습니다."),
+    EPISODE_NOT_FOUND(HttpStatus.NOT_FOUND, "EPISODE_404_1", "에피소드를 찾을 수 없습니다."),
+    INVALID_EPISODE_DATE(HttpStatus.BAD_REQUEST, "EPISODE_400_1", "에피소드의 날짜가 올바르지 않습니다."),
+    PLACEMENT_ALREADY_COMPLETED(HttpStatus.CONFLICT, "EPISODE_409_1", "이미 배치전을 완료했습니다."),
+    INSUFFICIENT_PLACEMENT_EPISODES(HttpStatus.BAD_REQUEST, "EPISODE_400_2", "배치전에 필요한 에피소드가 부족합니다."),
+    EPISODE_ALREADY_MATCHED(HttpStatus.CONFLICT, "EPISODE_409_2", "이미 해당 에피소드와 매치를 진행했습니다."),
 
     MATCH_NOT_FOUND(HttpStatus.NOT_FOUND, "MATCH_404_1", "매치를 찾을 수 없습니다."),
     INVALID_MATCH_RESULT(HttpStatus.BAD_REQUEST, "MATCH_400_1", "올바르지 않은 매치 결과입니다."),
     MATCH_ALREADY_COMPLETED(HttpStatus.CONFLICT, "MATCH_409_1", "이미 완료된 매치입니다."),
-    SAME_MEMORY_MATCH(HttpStatus.BAD_REQUEST, "MATCH_400_2", "동일한 기억끼리는 매치할 수 없습니다."),
+    SAME_EPISODE_MATCH(HttpStatus.BAD_REQUEST, "MATCH_400_2", "동일한 에피소드끼리는 매치할 수 없습니다."),
     AVAILABLE_MATCH_NOT_FOUND(HttpStatus.NOT_FOUND, "MATCH_404_2", "진행 가능한 매치가 없습니다."),
+    RING_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "MATCH_404_3", "링 참여를 찾을 수 없습니다."),
+    RING_SESSION_ALREADY_STARTED(HttpStatus.CONFLICT, "MATCH_409_2", "이미 해당 링에 참여했습니다."),
+    INSUFFICIENT_RING_EPISODES(HttpStatus.BAD_REQUEST, "MATCH_400_3", "링 진행에 필요한 에피소드가 부족합니다."),
+    RING_ROUND_OUT_OF_ORDER(HttpStatus.CONFLICT, "MATCH_409_3", "현재 진행할 수 있는 라운드가 아닙니다."),
 
     WEEKLY_SHOW_NOT_FOUND(HttpStatus.NOT_FOUND, "SHOW_404_1", "Weekly Show를 찾을 수 없습니다."),
     WEEKLY_SHOW_ALREADY_COMPLETED(HttpStatus.CONFLICT, "SHOW_409_1", "이번 Weekly Show를 이미 완료했습니다."),
