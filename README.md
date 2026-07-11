@@ -1,4 +1,4 @@
-# Team 6 Backend Technical README
+# Team 6 Backend
 
 Java 21과 Spring Boot 3.5 기반의 REST API 서버입니다. 인증, 회원 온보딩, 에피소드, 매칭, 쇼 세션, 랭킹, 히스토리 기능을 제공하며 MySQL과 JPA를 사용합니다.
 
